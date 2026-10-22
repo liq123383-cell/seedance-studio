@@ -1,6 +1,7 @@
 import { getRequestUser } from "@/lib/server-supabase";
 import {
   queryVolcengineBalance,
+  queryVolcengineResourcePackages,
   volcengineBillingIsConfigured
 } from "@/lib/volcengine-billing";
 
@@ -9,6 +10,7 @@ export const runtime = "nodejs";
 let cache:
   | {
       value: Awaited<ReturnType<typeof queryVolcengineBalance>>;
+      packages: Awaited<ReturnType<typeof queryVolcengineResourcePackages>>;
       expiresAt: number;
     }
   | null = null;
@@ -31,8 +33,13 @@ export async function GET(request: Request) {
 
   try {
     if (!cache || cache.expiresAt < Date.now()) {
+      const [balance, packages] = await Promise.all([
+        queryVolcengineBalance(),
+        queryVolcengineResourcePackages()
+      ]);
       cache = {
-        value: await queryVolcengineBalance(),
+        value: balance,
+        packages,
         expiresAt: Date.now() + 30_000
       };
     }
@@ -40,7 +47,8 @@ export async function GET(request: Request) {
     return Response.json(
       {
         configured: true,
-        balance: cache.value
+        balance: cache.value,
+        resourcePackages: cache.packages
       },
       {
         headers: {

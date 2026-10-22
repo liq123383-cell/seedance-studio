@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Icon } from "@/components/icons";
 import { estimateSeedanceCost, formatCny } from "@/lib/pricing";
+import type { ResourcePackage } from "@/lib/volcengine-billing";
 import type {
   AspectRatio,
   GenerationRequest,
@@ -52,6 +53,7 @@ type BalanceState = {
     currency: string;
     accountId: string;
   } | null;
+  resourcePackages?: ResourcePackage[];
   error?: string;
 };
 
@@ -147,6 +149,33 @@ export default function Home() {
     () => estimateSeedanceCost(resolution, ratio, duration),
     [duration, ratio, resolution]
   );
+
+  const seedancePackageSummary = useMemo(() => {
+    const packages =
+      balanceState?.resourcePackages?.filter(
+        (item) => item.isSeedance && item.status === "Effective"
+      ) ?? [];
+    if (!packages.length) return null;
+
+    const totals = new Map<string, number>();
+    packages.forEach((item) => {
+      totals.set(item.unit, (totals.get(item.unit) ?? 0) + item.availableAmount);
+    });
+    const nearestExpiry = packages
+      .map((item) => item.expiryTime)
+      .filter(Boolean)
+      .sort()[0];
+
+    return {
+      text: Array.from(totals.entries())
+        .map(
+          ([unit, amount]) =>
+            `${amount.toLocaleString("zh-CN")} ${unit}`
+        )
+        .join(" + "),
+      nearestExpiry
+    };
+  }, [balanceState?.resourcePackages]);
 
   function showToast(message: string) {
     setToast(message);
@@ -592,7 +621,11 @@ export default function Home() {
         <div className="topbar-actions">
           <span className="mode-pill">
             <span className="status-dot" />
-            {config?.seedanceConfigured ? "引擎在线" : "待配置"}
+            {config === null
+              ? "检测中"
+              : config.seedanceConfigured
+                ? "引擎在线"
+                : "待配置"}
           </span>
           <button
             className="account-button"
@@ -641,12 +674,22 @@ export default function Home() {
 
               <div className="account-summary">
                 <div className="account-balance">
-                  <span>火山方舟余额</span>
+                  <span>
+                    {seedancePackageSummary
+                      ? "Seedance 资源包"
+                      : balanceState?.resourcePackages
+                        ? "Seedance 资源包"
+                      : "火山方舟余额"}
+                  </span>
                   <strong>
                     {!user
                       ? "登录后查看"
                       : balanceLoading
                         ? "读取中…"
+                        : seedancePackageSummary
+                          ? seedancePackageSummary.text
+                          : balanceState?.resourcePackages
+                            ? "暂无可用余量"
                         : balanceState?.balance
                           ? formatCny(balanceState.balance.available)
                           : balanceState?.configured === false
@@ -655,11 +698,23 @@ export default function Home() {
                   </strong>
                   <small>
                     {user
-                      ? balanceState?.balance
-                        ? `可用资金 · ${balanceState.balance.currency}`
-                        : balanceState?.error ||
+                      ? seedancePackageSummary
+                        ? seedancePackageSummary.nearestExpiry
+                          ? `生效中 · 最近到期 ${new Date(
+                              seedancePackageSummary.nearestExpiry
+                            ).toLocaleDateString("zh-CN")}`
+                          : "生效中的资源包"
+                        : balanceState?.resourcePackages
+                          ? `现金余额 ${
+                              balanceState.balance
+                                ? formatCny(balanceState.balance.available)
+                                : "暂时不可用"
+                            } · 生成将按量后付费`
+                        : balanceState?.balance
+                          ? `现金可用余额 · ${balanceState.balance.currency}`
+                      : balanceState?.error ||
                           "需要配置只读费用中心 AccessKey"
-                      : "登录后自动同步账户余额"}
+                      : "登录后自动同步资源包余量"}
                   </small>
                 </div>
                 <div className="estimated-cost">
