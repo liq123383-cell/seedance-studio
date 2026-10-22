@@ -391,6 +391,7 @@ a {
 }
 
 .creator-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -2216,6 +2217,91 @@ a {
   padding-bottom: 80px;
 }
 
+.account-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 0;
+  margin-block: -4px 2px;
+  padding: 13px 14px;
+  background:
+    linear-gradient(100deg, rgba(216, 255, 110, 0.16), rgba(216, 255, 110, 0.035));
+  border: 1px solid rgba(12, 14, 11, 0.1);
+  border-radius: 11px;
+}
+
+.account-summary > div {
+  min-width: 0;
+  padding-inline: 4px;
+}
+
+.account-summary > div + div {
+  padding-left: 16px;
+  border-left: 1px solid rgba(12, 14, 11, 0.12);
+}
+
+.account-summary span {
+  display: block;
+  color: rgba(12, 14, 11, 0.48);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+}
+
+.account-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.account-summary small {
+  display: block;
+  max-width: 220px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: rgba(12, 14, 11, 0.38);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance-refresh {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 8px;
+  color: rgba(12, 14, 11, 0.56);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(12, 14, 11, 0.1);
+  border-radius: 50%;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.balance-refresh:hover {
+  color: var(--ink);
+  background: var(--acid);
+  transform: rotate(20deg);
+}
+
+.balance-refresh:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.cost-disclaimer {
+  margin: -11px 0 -4px;
+  color: rgba(12, 14, 11, 0.38);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
 @media (max-width: 680px) {
   .simple-intro {
     align-items: flex-start;
@@ -2235,5 +2321,20 @@ a {
   .creations {
     padding-top: 48px;
     padding-bottom: 54px;
+  }
+
+  .account-summary {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 12px;
+  }
+
+  .balance-refresh {
+    position: absolute;
+    right: 20px;
+    margin-top: -46px;
+  }
+
+  .account-summary strong {
+    font-size: 21px;
   }
 }

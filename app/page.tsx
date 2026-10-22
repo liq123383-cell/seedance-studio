@@ -9,6 +9,7 @@ import {
   type ChangeEvent
 } from "react";
 import { Icon } from "@/components/icons";
+import { estimateSeedanceCost, formatCny } from "@/lib/pricing";
 import type {
   AspectRatio,
   GenerationRequest,
@@ -38,6 +39,20 @@ type ResultState = {
   duration: number;
   resolution: Resolution;
   stored: boolean;
+  actualCost?: number;
+  actualTokens?: number;
+};
+
+type BalanceState = {
+  configured: boolean;
+  balance: {
+    available: number;
+    cash: number;
+    arrears: number;
+    currency: string;
+    accountId: string;
+  } | null;
+  error?: string;
 };
 
 function getLocalHistory(): VideoJob[] {
@@ -108,6 +123,8 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [history, setHistory] = useState<VideoJob[]>([]);
   const [config, setConfig] = useState<ConfigState | null>(null);
+  const [balanceState, setBalanceState] = useState<BalanceState | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const runRef = useRef(0);
@@ -126,6 +143,11 @@ export default function Home() {
     return 100;
   }, [elapsed, generationStatus, isGenerating]);
 
+  const estimatedCost = useMemo(
+    () => estimateSeedanceCost(resolution, ratio, duration),
+    [duration, ratio, resolution]
+  );
+
   function showToast(message: string) {
     setToast(message);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -138,6 +160,34 @@ export default function Home() {
     return data.session?.access_token
       ? { Authorization: `Bearer ${data.session.access_token}` }
       : ({} as Record<string, string>);
+  }
+
+  async function refreshBalance() {
+    if (!user) {
+      setBalanceState(null);
+      return;
+    }
+
+    setBalanceLoading(true);
+    try {
+      const headers = await requestHeaders();
+      const response = await fetch("/api/balance", {
+        headers,
+        cache: "no-store"
+      });
+      const data = (await response.json()) as BalanceState & {
+        error?: string;
+      };
+      setBalanceState(data);
+    } catch {
+      setBalanceState({
+        configured: true,
+        balance: null,
+        error: "余额暂时无法读取"
+      });
+    } finally {
+      setBalanceLoading(false);
+    }
   }
 
   async function loadHistory(nextUser: User | null) {
@@ -198,6 +248,10 @@ export default function Home() {
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    void refreshBalance();
+  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -357,17 +411,30 @@ export default function Home() {
         if (pollData.status === "succeeded") {
           const videoUrl = pollData.storedVideoUrl || pollData.videoUrl;
           if (!videoUrl) throw new Error("任务成功，但没有返回视频地址。");
+          const actualTokens = Number(
+            pollData.usage?.completion_tokens ??
+              pollData.usage?.total_tokens ??
+              0
+          );
+          const actualCost =
+            actualTokens > 0
+              ? (actualTokens * (resolution === "1080p" ? 77 : 70)) /
+                1_000_000
+              : undefined;
 
           setResult({
             videoUrl,
             prompt: prompt.trim(),
             duration,
             resolution,
-            stored: Boolean(pollData.storedVideoUrl)
+            stored: Boolean(pollData.storedVideoUrl),
+            actualCost,
+            actualTokens: actualTokens || undefined
           });
           setIsGenerating(false);
           if (timerRef.current) clearInterval(timerRef.current);
           showToast("成片已就绪，可以播放或下载。");
+          void refreshBalance();
 
           if (!data.persisted) {
             const job: VideoJob = {
@@ -572,6 +639,49 @@ export default function Home() {
                 </span>
               </div>
 
+              <div className="account-summary">
+                <div className="account-balance">
+                  <span>火山方舟余额</span>
+                  <strong>
+                    {!user
+                      ? "登录后查看"
+                      : balanceLoading
+                        ? "读取中…"
+                        : balanceState?.balance
+                          ? formatCny(balanceState.balance.available)
+                          : balanceState?.configured === false
+                            ? "待配置"
+                            : "暂时不可用"}
+                  </strong>
+                  <small>
+                    {user
+                      ? balanceState?.balance
+                        ? `可用资金 · ${balanceState.balance.currency}`
+                        : balanceState?.error ||
+                          "需要配置只读费用中心 AccessKey"
+                      : "登录后自动同步账户余额"}
+                  </small>
+                </div>
+                <div className="estimated-cost">
+                  <span>本次预计费用</span>
+                  <strong>{formatCny(estimatedCost)}</strong>
+                  <small>
+                    {resolution} · {ratio} · {duration} 秒
+                  </small>
+                </div>
+                {user && (
+                  <button
+                    className="balance-refresh"
+                    type="button"
+                    onClick={() => void refreshBalance()}
+                    disabled={balanceLoading}
+                    title="刷新余额"
+                  >
+                    <Icon name="refresh" size={16} />
+                  </button>
+                )}
+              </div>
+
               <label className="field-label" htmlFor="prompt">
                 画面描述
                 <span>{prompt.length} / 2500</span>
@@ -674,6 +784,12 @@ export default function Home() {
                 </button>
               </div>
 
+              <p className="cost-disclaimer">
+                价格按 Seedance 2.5 官方 token 公式和 24fps
+                估算，实际费用以成功任务返回的 token
+                用量为准；审核失败不收费。
+              </p>
+
               <div className="upload-row">
                 <input
                   ref={imageInputRef}
@@ -740,7 +856,9 @@ export default function Home() {
                 >
                   <span>
                     开始生成
-                    <small>约 1–5 分钟</small>
+                    <small>
+                      预计 {formatCny(estimatedCost)} · 约 1–5 分钟
+                    </small>
                   </span>
                   <span className="generate-icon">
                     <Icon name="arrow" size={19} />
@@ -829,6 +947,11 @@ export default function Home() {
                     <Icon name="audio" size={15} />
                     {generateAudio ? "有声音" : "无声音"}
                   </span>
+                  {typeof result?.actualCost === "number" && (
+                    <span>
+                      本次 {formatCny(result.actualCost)}
+                    </span>
+                  )}
                 </div>
                 {result && (
                   <a

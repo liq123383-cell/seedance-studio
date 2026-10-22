@@ -25,6 +25,8 @@ npm run dev
 ```env
 ARK_API_KEY=你的火山方舟APIKey
 SEEDANCE_MODEL=doubao-seedance-2-5-260628
+VOLC_ACCESSKEY=你的只读AccessKey
+VOLC_SECRETKEY=你的只读SecretKey
 ```
 
 没有 Supabase 时，仍可在本地测试文生视频；历史记录暂存在浏览器中。
@@ -57,6 +59,8 @@ MAX_ACTIVE_JOBS=2
 
 `SUPABASE_SERVICE_ROLE_KEY` 和 `ARK_API_KEY` 不能使用 `NEXT_PUBLIC_` 前缀。
 
+账户余额通过火山引擎费用中心的 `QueryBalanceAcct` 接口读取。建议使用仅授予余额查询权限的 IAM 子用户 AccessKey，并把密钥只放在服务端环境变量中。
+
 ## Seedance 配置
 
 1. 登录火山引擎并完成实名认证。
@@ -65,6 +69,8 @@ MAX_ACTIVE_JOBS=2
 4. 确认 API 域名是 `https://ark.cn-beijing.volces.com/api/v3`。
 
 Seedance 2.5 是异步任务接口。创建成功后网站会轮询任务状态，成功后播放并下载视频。服务端会在配置了 Supabase 时尝试把小于 80 MB 的结果转存到 `video-results` 存储桶。
+
+页面会按 Seedance 2.5 官方 token 估算公式实时显示预计费用。生成按钮上的金额是预估值，最终费用以任务成功后的 `usage` 和实际账单为准。
 
 ## 部署到 Vercel
 
