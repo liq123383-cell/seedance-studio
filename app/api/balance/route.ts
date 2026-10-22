@@ -1,5 +1,6 @@
 import { getRequestUser } from "@/lib/server-supabase";
 import {
+  getConfiguredSavingsPlan,
   queryVolcengineBalance,
   queryVolcengineResourcePackages,
   volcengineBillingIsConfigured
@@ -11,6 +12,7 @@ let cache:
   | {
       value: Awaited<ReturnType<typeof queryVolcengineBalance>>;
       packages: Awaited<ReturnType<typeof queryVolcengineResourcePackages>>;
+      savingsPlan: ReturnType<typeof getConfiguredSavingsPlan>;
       expiresAt: number;
     }
   | null = null;
@@ -40,6 +42,7 @@ export async function GET(request: Request) {
       cache = {
         value: balance,
         packages,
+        savingsPlan: getConfiguredSavingsPlan(),
         expiresAt: Date.now() + 30_000
       };
     }
@@ -48,7 +51,8 @@ export async function GET(request: Request) {
       {
         configured: true,
         balance: cache.value,
-        resourcePackages: cache.packages
+        resourcePackages: cache.packages,
+        savingsPlan: cache.savingsPlan
       },
       {
         headers: {

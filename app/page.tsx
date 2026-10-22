@@ -10,7 +10,10 @@ import {
 } from "react";
 import { Icon } from "@/components/icons";
 import { estimateSeedanceCost, formatCny } from "@/lib/pricing";
-import type { ResourcePackage } from "@/lib/volcengine-billing";
+import type {
+  ResourcePackage,
+  SavingsPlanSnapshot
+} from "@/lib/volcengine-billing";
 import type {
   AspectRatio,
   GenerationRequest,
@@ -54,6 +57,7 @@ type BalanceState = {
     accountId: string;
   } | null;
   resourcePackages?: ResourcePackage[];
+  savingsPlan?: SavingsPlanSnapshot | null;
   error?: string;
 };
 
@@ -176,6 +180,87 @@ export default function Home() {
       nearestExpiry
     };
   }, [balanceState?.resourcePackages]);
+  const savingsPlan = balanceState?.savingsPlan ?? null;
+  const accountBalanceView = useMemo(() => {
+    if (!user) {
+      return {
+        label: "Seedance 账户",
+        amount: "登录后查看",
+        detail: "登录后自动同步余额"
+      };
+    }
+
+    if (balanceLoading) {
+      return {
+        label:
+          savingsPlan?.name ??
+          (seedancePackageSummary ? "Seedance 资源包" : "火山方舟余额"),
+        amount: "读取中…",
+        detail: "正在同步费用中心数据"
+      };
+    }
+
+    if (savingsPlan) {
+      const expiry = savingsPlan.expiresAt
+        ? `${new Date(savingsPlan.expiresAt).toLocaleDateString("zh-CN")} 到期`
+        : "以火山控制台为准";
+      const updatedAt = savingsPlan.updatedAt
+        ? ` · 最近同步 ${new Date(
+            savingsPlan.updatedAt
+          ).toLocaleString("zh-CN")}`
+        : "";
+      return {
+        label: savingsPlan.name,
+        amount: formatCny(savingsPlan.remaining),
+        detail: `当前周期剩余 · ${expiry}${updatedAt}`
+      };
+    }
+
+    if (seedancePackageSummary) {
+      return {
+        label: "Seedance 资源包",
+        amount: seedancePackageSummary.text,
+        detail: seedancePackageSummary.nearestExpiry
+          ? `生效中 · 最近到期 ${new Date(
+              seedancePackageSummary.nearestExpiry
+            ).toLocaleDateString("zh-CN")}`
+          : "生效中的资源包"
+      };
+    }
+
+    if (balanceState?.resourcePackages) {
+      return {
+        label: "Seedance 资源包",
+        amount: "暂无可用余量",
+        detail: `现金余额 ${
+          balanceState.balance
+            ? formatCny(balanceState.balance.available)
+            : "暂时不可用"
+        } · 生成将按量后付费`
+      };
+    }
+
+    if (balanceState?.balance) {
+      return {
+        label: "火山方舟余额",
+        amount: formatCny(balanceState.balance.available),
+        detail: `现金可用余额 · ${balanceState.balance.currency}`
+      };
+    }
+
+    return {
+      label: "火山方舟余额",
+      amount: balanceState?.configured === false ? "待配置" : "暂时不可用",
+      detail:
+        balanceState?.error || "需要配置只读费用中心 AccessKey"
+    };
+  }, [
+    balanceLoading,
+    balanceState,
+    savingsPlan,
+    seedancePackageSummary,
+    user
+  ]);
 
   function showToast(message: string) {
     setToast(message);
@@ -674,48 +759,9 @@ export default function Home() {
 
               <div className="account-summary">
                 <div className="account-balance">
-                  <span>
-                    {seedancePackageSummary
-                      ? "Seedance 资源包"
-                      : balanceState?.resourcePackages
-                        ? "Seedance 资源包"
-                      : "火山方舟余额"}
-                  </span>
-                  <strong>
-                    {!user
-                      ? "登录后查看"
-                      : balanceLoading
-                        ? "读取中…"
-                        : seedancePackageSummary
-                          ? seedancePackageSummary.text
-                          : balanceState?.resourcePackages
-                            ? "暂无可用余量"
-                        : balanceState?.balance
-                          ? formatCny(balanceState.balance.available)
-                          : balanceState?.configured === false
-                            ? "待配置"
-                            : "暂时不可用"}
-                  </strong>
-                  <small>
-                    {user
-                      ? seedancePackageSummary
-                        ? seedancePackageSummary.nearestExpiry
-                          ? `生效中 · 最近到期 ${new Date(
-                              seedancePackageSummary.nearestExpiry
-                            ).toLocaleDateString("zh-CN")}`
-                          : "生效中的资源包"
-                        : balanceState?.resourcePackages
-                          ? `现金余额 ${
-                              balanceState.balance
-                                ? formatCny(balanceState.balance.available)
-                                : "暂时不可用"
-                            } · 生成将按量后付费`
-                        : balanceState?.balance
-                          ? `现金可用余额 · ${balanceState.balance.currency}`
-                      : balanceState?.error ||
-                          "需要配置只读费用中心 AccessKey"
-                      : "登录后自动同步资源包余量"}
-                  </small>
+                  <span>{accountBalanceView.label}</span>
+                  <strong>{accountBalanceView.amount}</strong>
+                  <small>{accountBalanceView.detail}</small>
                 </div>
                 <div className="estimated-cost">
                   <span>本次预计费用</span>

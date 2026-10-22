@@ -27,6 +27,11 @@ ARK_API_KEY=你的火山方舟APIKey
 SEEDANCE_MODEL=doubao-seedance-2-5-260628
 VOLC_ACCESSKEY=你的只读AccessKey
 VOLC_SECRETKEY=你的只读SecretKey
+VOLC_SAVINGS_PLAN_NAME=AI 统一节省计划
+VOLC_SAVINGS_PLAN_TOTAL=200
+VOLC_SAVINGS_PLAN_BALANCE=192.377
+VOLC_SAVINGS_PLAN_EXPIRES_AT=2026-11-22T16:59:59+08:00
+VOLC_SAVINGS_PLAN_UPDATED_AT=2026-10-22T18:05:00+08:00
 ```
 
 没有 Supabase 时，仍可在本地测试文生视频；历史记录暂存在浏览器中。
@@ -59,7 +64,9 @@ MAX_ACTIVE_JOBS=2
 
 `SUPABASE_SERVICE_ROLE_KEY` 和 `ARK_API_KEY` 不能使用 `NEXT_PUBLIC_` 前缀。
 
-账户余额通过火山引擎费用中心的 `QueryBalanceAcct` 接口读取。建议使用仅授予余额查询权限的 IAM 子用户 AccessKey，并把密钥只放在服务端环境变量中。
+账户余额通过火山引擎费用中心的 `QueryBalanceAcct` 接口读取，Seedance Tokens 资源包通过 `ListResourcePackages` 读取。建议使用仅授予余额和资源包查询权限的 IAM 子用户 AccessKey，并把密钥只放在服务端环境变量中。
+
+AI 统一节省计划目前没有开放公开的余额查询 OpenAPI，因此页面中的节省计划余额使用最近从费用中心同步的配置值，并显示同步时间。生成后应回到费用中心节省计划页面核对最新余量。
 
 ## Seedance 配置
 

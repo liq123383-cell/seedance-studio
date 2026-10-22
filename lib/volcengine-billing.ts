@@ -25,6 +25,16 @@ export type ResourcePackage = {
   isSeedance: boolean;
 };
 
+export type SavingsPlanSnapshot = {
+  name: string;
+  total: number;
+  remaining: number;
+  currency: string;
+  status: string;
+  expiresAt: string;
+  updatedAt: string;
+};
+
 function sha256Hex(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -52,6 +62,23 @@ export function volcengineBillingIsConfigured() {
   return Boolean(
     process.env.VOLC_ACCESSKEY && process.env.VOLC_SECRETKEY
   );
+}
+
+export function getConfiguredSavingsPlan(): SavingsPlanSnapshot | null {
+  const remaining = Number(process.env.VOLC_SAVINGS_PLAN_BALANCE);
+  if (!Number.isFinite(remaining) || remaining < 0) return null;
+
+  const total = Number(process.env.VOLC_SAVINGS_PLAN_TOTAL);
+  return {
+    name:
+      process.env.VOLC_SAVINGS_PLAN_NAME || "AI 统一节省计划",
+    total: Number.isFinite(total) ? total : remaining,
+    remaining,
+    currency: process.env.VOLC_SAVINGS_PLAN_CURRENCY || "CNY",
+    status: process.env.VOLC_SAVINGS_PLAN_STATUS || "Effective",
+    expiresAt: process.env.VOLC_SAVINGS_PLAN_EXPIRES_AT || "",
+    updatedAt: process.env.VOLC_SAVINGS_PLAN_UPDATED_AT || ""
+  };
 }
 
 async function signedRequest(
