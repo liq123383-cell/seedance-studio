@@ -530,6 +530,7 @@ export default function Home() {
           <button
             className="account-button"
             type="button"
+            aria-label={user ? "账户设置" : "登录"}
             onClick={() => setAuthOpen(true)}
           >
             <Icon name={user ? "user" : "arrow"} size={17} />
