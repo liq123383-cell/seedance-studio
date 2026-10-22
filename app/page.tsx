@@ -699,7 +699,7 @@ export default function Home() {
         </a>
 
         <nav className="main-nav" aria-label="主导航">
-          <a href="#studio">AI 生成</a>
+          <a href="#ai-generation">AI 生成</a>
           <a href="#creations">历史记录</a>
         </nav>
 
@@ -725,7 +725,10 @@ export default function Home() {
       </header>
 
       <main>
-        <section className="simple-intro container">
+        <section
+          className="simple-intro container"
+          id="ai-generation"
+        >
           <div>
             <span className="eyebrow">AI VIDEO GENERATION</span>
             <h1>AI 视频生成</h1>
