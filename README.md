@@ -77,6 +77,18 @@ git push -u origin main
 
 在 Vercel 导入仓库，把 `.env.local` 中的变量填写到 Vercel Project Settings → Environment Variables，再点击 Deploy。仓库中的 GitHub Actions 会分别在推送和 Pull Request 时执行类型检查与生产构建。
 
+## 部署到 Netlify
+
+项目已包含 `netlify.toml` 和 Next.js Runtime 插件。也可以在项目目录执行：
+
+```bash
+npx netlify-cli login
+npx netlify-cli init
+npx netlify-cli deploy --build --prod
+```
+
+首次部署后，在 Netlify 的 Site configuration → Environment variables 中配置 `.env.local` 的全部变量，并重新部署。
+
 Supabase Authentication → URL Configuration 中需要加入：
 
 ```text

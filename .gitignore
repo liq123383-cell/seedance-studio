@@ -4,6 +4,8 @@ node_modules
 .env.local
 .env.*.local
 .vercel
+.netlify
 *.log
 *.tsbuildinfo
+*.swp
 .DS_Store

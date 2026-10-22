@@ -21,12 +21,22 @@ create index if not exists video_jobs_user_created_idx
 
 alter table public.video_jobs enable row level security;
 
-drop policy if exists "Users can read their own video jobs"
-  on public.video_jobs;
-create policy "Users can read their own video jobs"
-  on public.video_jobs
-  for select
-  using (auth.uid() = user_id);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'video_jobs'
+      and policyname = 'Users can read their own video jobs'
+  ) then
+    create policy "Users can read their own video jobs"
+      on public.video_jobs
+      for select
+      using (auth.uid() = user_id);
+  end if;
+end
+$$;
 
 -- The service role is used by server routes to create and update jobs.
 -- Do not add permissive insert/update policies for the browser.
@@ -35,30 +45,50 @@ insert into storage.buckets (id, name, public)
 values
   ('video-inputs', 'video-inputs', true),
   ('video-results', 'video-results', true)
-on conflict (id) do update set public = excluded.public;
+on conflict (id) do nothing;
 
-drop policy if exists "Users can upload their own video inputs"
-  on storage.objects;
-create policy "Users can upload their own video inputs"
-  on storage.objects
-  for insert
-  to authenticated
-  with check (
-    bucket_id = 'video-inputs'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'Users can upload their own video inputs'
+  ) then
+    create policy "Users can upload their own video inputs"
+      on storage.objects
+      for insert
+      to authenticated
+      with check (
+        bucket_id = 'video-inputs'
+        and (storage.foldername(name))[1] = auth.uid()::text
+      );
+  end if;
+end
+$$;
 
-drop policy if exists "Users can update their own video inputs"
-  on storage.objects;
-create policy "Users can update their own video inputs"
-  on storage.objects
-  for update
-  to authenticated
-  using (
-    bucket_id = 'video-inputs'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  )
-  with check (
-    bucket_id = 'video-inputs'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'Users can update their own video inputs'
+  ) then
+    create policy "Users can update their own video inputs"
+      on storage.objects
+      for update
+      to authenticated
+      using (
+        bucket_id = 'video-inputs'
+        and (storage.foldername(name))[1] = auth.uid()::text
+      )
+      with check (
+        bucket_id = 'video-inputs'
+        and (storage.foldername(name))[1] = auth.uid()::text
+      );
+  end if;
+end
+$$;
