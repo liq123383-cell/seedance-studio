@@ -13,6 +13,7 @@ export type IconName =
   | "play"
   | "refresh"
   | "sparkle"
+  | "trash"
   | "upload"
   | "user";
 
@@ -86,6 +87,14 @@ export function Icon({
       <>
         <path d="M12 3c.5 4.6 2.4 6.5 7 7-4.6.5-6.5 2.4-7 7-.5-4.6-2.4-6.5-7-7 4.6-.5 6.5-2.4 7-7Z" />
         <path d="M19 16c.2 1.8.9 2.5 2.7 2.7-1.8.2-2.5.9-2.7 2.7-.2-1.8-.9-2.5-2.7-2.7 1.8-.2 2.5-.9 2.7-2.7Z" />
+      </>
+    ),
+    trash: (
+      <>
+        <path d="M4 7h16" />
+        <path d="M9 7V5h6v2" />
+        <path d="m6 7 1 14h10l1-14" />
+        <path d="M10 11v6M14 11v6" />
       </>
     ),
     upload: (

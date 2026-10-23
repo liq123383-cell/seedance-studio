@@ -38,6 +38,7 @@ type ConfigState = {
 };
 
 type ResultState = {
+  taskId: string;
   videoUrl: string;
   prompt: string;
   duration: number;
@@ -131,6 +132,7 @@ export default function Home() {
   const [config, setConfig] = useState<ConfigState | null>(null);
   const [balanceState, setBalanceState] = useState<BalanceState | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const runRef = useRef(0);
@@ -537,6 +539,7 @@ export default function Home() {
               : undefined;
 
           setResult({
+            taskId: providerTaskId,
             videoUrl,
             prompt: prompt.trim(),
             duration,
@@ -667,6 +670,7 @@ export default function Home() {
     setResult(
       videoUrl
         ? {
+            taskId: job.provider_task_id,
             videoUrl,
             prompt: job.prompt,
             duration: job.duration,
@@ -679,6 +683,67 @@ export default function Home() {
       behavior: "smooth",
       block: "start"
     });
+  }
+
+  async function deleteHistoryItem(job: VideoJob) {
+    if (deletingJobId) return;
+
+    const confirmed = window.confirm(
+      user
+        ? "删除后会同时移除云端记录和已归档视频，且无法恢复。确定删除吗？"
+        : "删除后无法恢复，确定删除这条本地记录吗？"
+    );
+    if (!confirmed) return;
+
+    setDeletingJobId(job.id);
+    try {
+      if (user) {
+        const headers = await requestHeaders();
+        const response = await fetch(
+          `/api/video/${encodeURIComponent(
+            job.provider_task_id
+          )}?permanent=true`,
+          {
+            method: "DELETE",
+            headers
+          }
+        );
+        const data = (await response.json()) as {
+          error?: string;
+          detail?: string;
+        };
+        if (!response.ok) {
+          throw new Error(
+            data.error || data.detail || "删除历史记录失败。"
+          );
+        }
+      }
+
+      setHistory((current) => {
+        const next = current.filter((item) => item.id !== job.id);
+        if (!user) setLocalHistory(next);
+        return next;
+      });
+
+      if (result?.taskId === job.provider_task_id) {
+        setResult(null);
+        setGenerationStatus("idle");
+      }
+      if (activeTaskId === job.provider_task_id) {
+        setActiveTaskId(null);
+      }
+
+      showToast(user ? "历史记录已永久删除。" : "本地历史记录已删除。");
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error
+          ? deleteError.message
+          : "删除历史记录失败。";
+      showToast(message);
+      setError(message);
+    } finally {
+      setDeletingJobId(null);
+    }
   }
 
   return (
@@ -1093,37 +1158,54 @@ export default function Home() {
               {history.slice(0, 6).map((job, index) => {
                 const videoUrl = job.stored_video_url || job.provider_video_url;
                 return (
-                  <button
-                    type="button"
-                    className="history-card"
-                    key={job.id}
-                    onClick={() => openHistoryItem(job)}
-                  >
-                    <div className={`history-thumb tone-${index % 3}`}>
-                      {videoUrl ? (
-                        <video src={videoUrl} muted playsInline preload="metadata" />
-                      ) : (
-                        <>
-                          <span className="history-orb" />
-                          <span className="history-line" />
-                        </>
-                      )}
-                      <span className="history-play">
-                        <Icon name="play" size={17} />
-                      </span>
-                    </div>
-                    <div className="history-info">
-                      <span className={`history-status ${job.status}`}>
-                        {statusCopy(job.status)}
-                      </span>
-                      <p>{job.prompt}</p>
-                      <div className="history-meta">
-                        <span>{job.ratio}</span>
-                        <span>{job.duration}s</span>
-                        <span>{job.resolution}</span>
+                  <div className="history-item" key={job.id}>
+                    <button
+                      type="button"
+                      className="history-card"
+                      onClick={() => openHistoryItem(job)}
+                      disabled={deletingJobId === job.id}
+                    >
+                      <div className={`history-thumb tone-${index % 3}`}>
+                        {videoUrl ? (
+                          <video
+                            src={videoUrl}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <>
+                            <span className="history-orb" />
+                            <span className="history-line" />
+                          </>
+                        )}
+                        <span className="history-play">
+                          <Icon name="play" size={17} />
+                        </span>
                       </div>
-                    </div>
-                  </button>
+                      <div className="history-info">
+                        <span className={`history-status ${job.status}`}>
+                          {statusCopy(job.status)}
+                        </span>
+                        <p>{job.prompt}</p>
+                        <div className="history-meta">
+                          <span>{job.ratio}</span>
+                          <span>{job.duration}s</span>
+                          <span>{job.resolution}</span>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="history-delete"
+                      aria-label={`删除作品：${job.prompt.slice(0, 30)}`}
+                      title="删除历史记录"
+                      onClick={() => void deleteHistoryItem(job)}
+                      disabled={deletingJobId === job.id}
+                    >
+                      <Icon name="trash" size={15} />
+                    </button>
+                  </div>
                 );
               })}
             </div>

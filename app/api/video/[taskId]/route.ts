@@ -164,45 +164,92 @@ export async function DELETE(
   context: { params: Promise<{ taskId: string }> }
 ) {
   const { taskId } = await context.params;
+  if (!/^[a-zA-Z0-9-]+$/.test(taskId)) {
+    return Response.json({ error: "任务 ID 无效。" }, { status: 400 });
+  }
+
+  const permanent =
+    new URL(request.url).searchParams.get("permanent") === "true";
 
   try {
     const user = await getRequestUser(request);
-    if (authenticationIsRequired() && !user) {
+    if ((authenticationIsRequired() || permanent) && !user) {
       return Response.json({ error: "请先登录。" }, { status: 401 });
     }
 
     const admin = getAdminSupabase();
+    if (permanent && (!admin || !user)) {
+      return Response.json(
+        { error: "删除历史记录需要数据库服务配置。" },
+        { status: 503 }
+      );
+    }
+
+    let ownedJob: {
+      id: string;
+      status: string;
+      stored_video_url: string | null;
+    } | null = null;
+
     if (admin && user) {
-      const { data: ownedJob } = await admin
+      const { data } = await admin
         .from("video_jobs")
-        .select("id")
+        .select("id,status,stored_video_url")
         .eq("provider_task_id", taskId)
         .eq("user_id", user.id)
         .maybeSingle();
+      ownedJob = data;
 
       if (!ownedJob) {
         return Response.json({ error: "任务不存在。" }, { status: 404 });
       }
     }
 
-    const response = await fetch(
-      `${ARK_BASE_URL}/contents/generations/tasks/${taskId}`,
-      {
-        method: "DELETE",
-        headers: arkHeaders(),
-        signal: AbortSignal.timeout(20_000)
-      }
-    );
-    const data = await safeJson(response);
+    const shouldCancel =
+      !permanent ||
+      ownedJob?.status === "queued" ||
+      ownedJob?.status === "running";
 
-    if (!response.ok && response.status !== 404) {
-      return Response.json(
-        { error: "取消任务失败。", detail: data },
-        { status: response.status }
+    if (shouldCancel) {
+      const response = await fetch(
+        `${ARK_BASE_URL}/contents/generations/tasks/${taskId}`,
+        {
+          method: "DELETE",
+          headers: arkHeaders(),
+          signal: AbortSignal.timeout(20_000)
+        }
       );
+      const data = await safeJson(response);
+
+      if (!response.ok && response.status !== 404) {
+        return Response.json(
+          {
+            error: permanent ? "删除前停止任务失败。" : "取消任务失败。",
+            detail: data
+          },
+          { status: response.status }
+        );
+      }
     }
 
-    if (admin && user) {
+    if (permanent && admin && user) {
+      const storagePath = `${user.id}/${taskId}.mp4`;
+      const { error: storageError } = await admin.storage
+        .from("video-results")
+        .remove([storagePath]);
+      if (storageError) {
+        throw new Error(`删除已归档视频失败：${storageError.message}`);
+      }
+
+      const { error: deleteError } = await admin
+        .from("video_jobs")
+        .delete()
+        .eq("provider_task_id", taskId)
+        .eq("user_id", user.id);
+      if (deleteError) {
+        throw new Error(`删除历史记录失败：${deleteError.message}`);
+      }
+    } else if (admin && user) {
       await admin
         .from("video_jobs")
         .update({
@@ -216,7 +263,11 @@ export async function DELETE(
     return Response.json({ ok: true });
   } catch (error) {
     return Response.json(
-      { error: `取消任务失败：${errorMessage(error)}` },
+      {
+        error: `${
+          permanent ? "删除历史记录失败" : "取消任务失败"
+        }：${errorMessage(error)}`
+      },
       { status: 500 }
     );
   }
